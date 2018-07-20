@@ -238,7 +238,7 @@ class MouseComponent(BaseComponent):
 
         # might not be saving clicks, but want it to force end of trial
         if (self.params['saveMouseState'].val not in
-                ['every frame', 'on click'] and forceEnd=='never'):
+                ['every frame', 'on click'] and forceEnd == 'never'):
             return
 
         buff.writeIndented("# *%s* updates\n" % self.params['name'])
@@ -276,9 +276,6 @@ class MouseComponent(BaseComponent):
         buff.writeIndented(code)
         buff.setIndentLevel(1, relative=True)  # to get out of if statement
         dedentAtEnd = 1  # keep track of how far to dedent later
-        if self.params['timeRelativeTo'].val.lower() == 'mouse onset':
-            code = "%(name)s.mouseClock.reset()\n" % self.params
-            buff.writeIndented(code)
 
         # write param checking code
         if (self.params['saveMouseState'].val == 'on click'
@@ -485,6 +482,7 @@ class MouseComponent(BaseComponent):
                     "{loopName}.addData('{mouseName}.leftButton', buttons[0])\n" 
                     "{loopName}.addData('{mouseName}.midButton', buttons[1])\n" 
                     "{loopName}.addData('{mouseName}.rightButton', buttons[2])\n"
+                    "{loopName}.addData('{mouseName}.time', {mouseName}.time)\n"
                 )
 
                 # then add `trials.addData('mouse.clicked_name',.....)`
@@ -574,7 +572,7 @@ class MouseComponent(BaseComponent):
                     "psychoJS.experiment.addData('{mouseName}.leftButton', buttons[0]);\n"
                     "psychoJS.experiment.addData('{mouseName}.midButton', buttons[1]);\n"
                     "psychoJS.experiment.addData('{mouseName}.rightButton', buttons[2]);\n"
-                    "psychoJS.experiment.addData('{mouseName}.RT', %s.time[0] );\n" % self.params['name']
+                    "psychoJS.experiment.addData('{mouseName}.RT', %s.time );\n" % self.params['name']
                 )
 
                 # then add `trials.addData('mouse.clicked_name',.....)`
