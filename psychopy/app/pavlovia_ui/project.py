@@ -515,6 +515,11 @@ def syncProject(parent, project=None, closeFrameWhenDone=False):
         if outcome == -1:  # user cancelled
             syncFrame.Destroy()
             return -1
+        elif outcome == -2:  # Merge conflict
+            resolutionDlg = GitConflictResolution(parent=parent, project=project)
+            resolution = resolutionDlg.ShowModal()
+            if resolution:
+                return -1
         try:
             status = project.sync(syncFrame.syncPanel.infoStream)
             if status == -1:
@@ -619,3 +624,83 @@ class ProjectRecreator(wx.Dialog):
                                           "yet implemented")
         else:
             return -1
+
+class GitConflictResolution(wx.Dialog):
+    """Use this Dlg to handle merge conflicts that cannot be handled automatically.
+    This will ask the user whether or not to overwrite files with local or remote changes
+    """
+
+    def __init__(self, project, parent, *args, **kwargs):
+        wx.Dialog.__init__(self, parent, *args, **kwargs)
+        self.parent = parent
+        self.project = project
+        self.Title = _translate("Git merge operations")
+        existingName = project.name
+        msgText = _translate("has a merge conflict.")
+        msg = wx.StaticText(self, label="{} {}".format(existingName, msgText))
+        choices = [_translate("Merge and overwrite conflicts with local changes"),
+                   _translate("Merge and overwrite conflicts with remote changes"),
+                   _translate("Abort sync. I'll resolve the conflict manually using git")]
+        self.radioCtrl = wx.RadioBox(self,
+                                     label=_translate("What shall we do?"),
+                                     choices=choices,
+                                     majorDimension=1)
+
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        buttonSizer = wx.BoxSizer(wx.HORIZONTAL)
+        buttonSizer.Add(wx.Button(self, id=wx.ID_OK, label=_translate("OK")),
+                      1, wx.ALL | wx.ALIGN_RIGHT, 5)
+        buttonSizer.Add(wx.Button(self, id=wx.ID_CANCEL, label=_translate("Cancel")),
+                      1, wx.ALL | wx.ALIGN_RIGHT, 5)
+        mainSizer.Add(msg, 1, wx.ALL | wx.ALIGN_LEFT, 25)
+        mainSizer.Add(self.radioCtrl, 1, wx.ALL | wx.ALIGN_CENTER_HORIZONTAL, 5)
+        mainSizer.Add(buttonSizer, 1, wx.ALL | wx.ALIGN_RIGHT, 1)
+
+        self.SetSizer(mainSizer)
+        self.Layout()
+
+    def ShowModal(self):
+        if wx.Dialog.ShowModal(self) == wx.ID_OK:
+            choice = self.radioCtrl.GetSelection()
+            if choice == 0:
+                # use local
+                unmerged_blobs = self.project.repo.index.unmerged_blobs()
+                # This gets the dictionary discussed above
+                # unmerged_blobs = self.repo.index.unmerged_blobs()
+
+                # We're really interested in the stage each blob is associated with.
+                # So we'll iterate through all of the paths and the entries in each value
+                # list, but we won't do anything with most of the values.
+                # for path in unmerged_blobs:
+                #     list_of_blobs = unmerged_blobs[path]
+                #     for (stage, blob) in list_of_blobs:
+                #
+                #         if stage == 3:
+                #             fileName, ext = os.path.splitext(blob.name)
+                #             new_file_path = os.path.join(self.repo.working_tree_dir, 'remote{}{}'.format(fileName, ext))
+                #             with open(new_file_path, 'w', encoding='utf-8-sig') as f:
+                #                 f.write(str(blob.data_stream.read(), encoding='utf-8'))
+                #             # Delete indexes of unwanted blob
+                #             self.repo.index.remove([blob.path])
+                #     self.repo.index.add([new_file_path])
+                #     changeDict['changed'].append(new_file_path)
+                #     changeDict['deleted'].append(this.b_path)
+                #
+                #
+                # # self.repo.index.remove()
+                # stage 1: local changes
+                # stage 2: common ancester
+                # stage 3: remote changes
+                self.project.repo.git.checkout("-b", "newBranch")
+                self.project.repo.git.checkout("master")
+                self.project.repo.git.pull("--rebase", "origin/master")
+                self.project.repo.git.merge("newBranch")
+                self.project.repo.git.branch("-d", "newBranch")
+                self.project.repo.git.push("origin/master")
+            elif choice == 1:
+                # use remote
+                self.project.repo.git.merge("--strategy-option", "ours")
+            elif choice == 2:
+                # abort
+                self.project.repo.git.merge("--abort")
+

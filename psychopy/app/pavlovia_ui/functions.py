@@ -93,10 +93,15 @@ def showCommitDialog(parent, project, initMsg="", infoStream=None):
     1 successful commit
     -1 user cancelled
     """
-    changeDict, changeList = project.getChanges()
+    try:
+        changeDict, changeList = project.getChanges()
+    except git.UnmergedEntriesError as err:
+        print(err)
+        return -2
     # if changeList is empty then nothing to do
     if not changeList:
         return 0
+
 
     changeInfo = "Changes to commit:\n"
     for categ in ['untracked', 'changed', 'deleted', 'renamed']:
