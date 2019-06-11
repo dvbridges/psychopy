@@ -18,5 +18,5 @@
 from psychopy.projects import pavlovia
 from .functions import *
 from .project import ProjectEditor, syncProject
-from ._base import PavloviaMiniBrowser
+from ._base import PavloviaMiniBrowser, PavloviaLaunchCenter
 from . import menu, project, search, toolbar

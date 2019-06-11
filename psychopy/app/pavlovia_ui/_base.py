@@ -8,9 +8,14 @@
 import wx
 import wx.html2
 
+import re
+import locale
 from psychopy.localization import _translate
+from psychopy.warnings import _BaseErrorHandler
 from psychopy.projects import pavlovia
 from psychopy import logging
+from psychopy.app import stdOutRich
+from . import sync
 
 
 class BaseFrame(wx.Frame):
@@ -226,3 +231,139 @@ class PavloviaCommitDialog(wx.Dialog):
             if not self.commitDescrCtrl.IsEmpty():
                 commitMsg += "\n\n" + self.commitDescrCtrl.GetValue()
         return commitMsg
+
+class IssuesRichText(stdOutRich.StdOutRich):
+    """
+    Modified StdOutRich class for handling warnings with error codes
+    """
+    def __init__(self, *args, **kwargs):
+        super(IssuesRichText, self).__init__(*args, **kwargs)
+        self._prefEncoding = locale.getpreferredencoding()
+
+    def getSringFromErrorList(self, err):
+        errorString = ''
+        for item in err:
+            errorString += "{}\n{}\n{}\n{}\n".format(item['code'], item['obj'], item['msg'], item['trace'][-1])
+        return errorString
+
+    def write(self, inStr):
+        self.MoveEnd()  # always 'append' text rather than 'writing' it
+        # if it comes form a stdout in Py3 then convert to unicode
+        inStr = self.getSringFromErrorList(inStr)
+        if type(inStr) == bytes:
+            try:
+                inStr = inStr.decode('utf-8')
+            except UnicodeDecodeError:
+                inStr = inStr.decode(self._prefEncoding)
+
+        for thisLine in inStr.splitlines(True):
+            try:
+                thisLine = thisLine.replace("\t", "    ")
+            except Exception as e:
+                self.WriteText(str(e))
+            # if len(re.findall('".*", line.*', thisLine)) > 0:
+            #     # this line contains a file/line location so write as URL
+            #     # self.BeginStyle(self.urlStyle)  # this should be done with
+            #     # styles, but they don't exist in wx as late as 2.8.4.0
+            #     self.BeginBold()
+            #     self.BeginTextColour(wx.BLUE)
+            #     self.BeginURL(thisLine)
+            #     self.WriteText(thisLine)
+            #     self.EndURL()
+            #     self.EndBold()
+            #     self.EndTextColour()
+            # Get re to find error codes, and format accordingly
+            if len(re.findall('200', thisLine)) > 0:
+                self.BeginTextColour([0, 150, 0])
+                self.WriteText(thisLine)
+                self.EndTextColour()
+            elif len(re.findall('100', thisLine)) > 0:
+                self.BeginTextColour([150, 0, 0])
+                self.WriteText(thisLine)
+                self.EndTextColour()
+            else:
+                # line to write as simple text
+                self.WriteText(thisLine)
+        self.MoveEnd()  # go to end of stdout so user can see updated text
+        self.ShowPosition(self.GetLastPosition())
+
+class PavloviaLaunchCenter(wx.Dialog):
+    """
+    The Pavlovia Launch Dialog. Presents:
+        > Project name
+        > Git sync status and sync button
+        > Issues panel
+        > Settings button to launch internal browser
+        > Project URL with copy button
+    """
+
+    def __init__(self, frame, *args, **kwargs):
+        super(PavloviaLaunchCenter, self).__init__(frame, size = (500,600), *args, **kwargs)
+        self.errorHandler = None
+        self.frame = frame
+        # panel = wx.Panel(self, size=(500, 600))
+
+        # Set IssueDLG elements
+        self.projectLabel = wx.StaticText(self, label='Project: ', size=(100, 20))
+        self.project = wx.TextCtrl(self, value='', size=(300, 20), style=wx.TE_READONLY)
+        self.syncPanel = sync.SyncStatusPanel(self, size=(400, 100), id=wx.ID_ANY)
+        self.issuePanel = IssuesRichText(self, size=(400,100), style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER)
+        self.urlLabel = wx.adv.HyperlinkCtrl(self, size=(300, 20), label=self.projectURL)
+
+        # Create sizers for elements
+        mainSizer = wx.BoxSizer(wx.VERTICAL)
+        nameSizer = wx.BoxSizer(wx.HORIZONTAL)
+        gitStatusSizer = wx.BoxSizer(wx.HORIZONTAL)
+        issueSizer = wx.BoxSizer(wx.HORIZONTAL)
+        projectURLSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Add elements to sizers
+        nameSizer.Add(self.projectLabel, 1, wx.TOP | wx.BOTTOM | wx.LEFT, border=40)
+        nameSizer.Add(self.project, 1, wx.TOP | wx.RIGHT | wx.BOTTOM, border=40)
+        gitStatusSizer.Add(self.syncPanel, 1, wx.ALL | wx.CENTER, border=10)
+        issueSizer.Add(self.issuePanel, 1, wx.ALL | wx.CENTER, border=20)
+        projectURLSizer.Add(self.urlLabel, 1, wx.TOP | wx.BOTTOM | wx.LEFT, border=40)
+
+        # Set sizers
+        mainSizer.Add(nameSizer)
+        mainSizer.Add(gitStatusSizer, 1, wx.ALIGN_CENTER_HORIZONTAL)
+        mainSizer.Add(issueSizer, 1, wx.ALIGN_CENTER_HORIZONTAL)
+        mainSizer.Add(projectURLSizer)
+        self.SetSizer(mainSizer)
+
+        self.setProject()
+        self.setErrorHandler()
+
+    def onURL(self, evt):
+        pass
+
+    def setErrorHandler(self):
+        self.errorHandler = ErrorHandler()
+
+    @property
+    def projectName(self):
+        return self.frame.project['id']
+
+    def setProject(self):
+        self.project.SetValue(self.projectName)
+
+    def getGitStatus(self):
+        pass
+
+    def getIssues(self):
+        pass
+
+    def getSettings(self):
+        pass
+
+    @property
+    def projectURL(self):
+        prefix = "https://run.pavlovia.org/"
+        project = self.frame.project['id']
+        suffix = "/html"
+        return "{}{}{}".format(prefix, project, suffix)
+
+class ErrorHandler(_BaseErrorHandler):
+    def __init__(self):
+        super(ErrorHandler, self).__init__()
+        self.setStdErr()

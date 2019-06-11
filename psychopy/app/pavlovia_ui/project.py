@@ -474,8 +474,9 @@ def syncProject(parent, project=None, closeFrameWhenDone=False):
             logging.error("Failed to recreate project to sync with")
             return
 
-    # a sync will be necessary so can create syncFrame
-    syncFrame = sync.SyncFrame(parent=parent, id=wx.ID_ANY, project=project)
+    # a sync will be necessary so redirect to LaunchPad
+    syncFrame = parent.PavLaunch
+    syncFrame.Show()
 
     if project._newRemote:
         # new remote so this will be a first push
@@ -487,7 +488,7 @@ def syncProject(parent, project=None, closeFrameWhenDone=False):
                               initMsg="First commit",
                               infoStream=syncFrame.syncPanel.infoStream)
         if ok == -1:  # cancelled
-            syncFrame.Destroy()
+            syncFrame.syncPanel.setStatus("Commit cancelled.")
             return -1
         syncFrame.syncPanel.setStatus("Pushing files to Pavlovia")
         wx.Yield()
@@ -513,7 +514,7 @@ def syncProject(parent, project=None, closeFrameWhenDone=False):
                                    infoStream=syncFrame.syncPanel.infoStream)
         # 0=nothing to do, 1=OK, -1=cancelled
         if outcome == -1:  # user cancelled
-            syncFrame.Destroy()
+            syncFrame.syncPanel.statusAppend("Commit cancelled.")
             return -1
         try:
             status = project.sync(syncFrame.syncPanel.infoStream)
@@ -524,10 +525,14 @@ def syncProject(parent, project=None, closeFrameWhenDone=False):
             closeFrameWhenDone = False
             syncFrame.syncPanel.statusAppend(traceback.format_exc())
 
+    # Check for errors
+    if len(syncFrame.errorHandler.errList):
+        syncFrame.issuePanel.write(syncFrame.errorHandler.errList)
+
     wx.Yield()
     project._lastKnownSync = time.time()
     if closeFrameWhenDone:
-        syncFrame.Destroy()
+        syncFrame.Close()
 
     return 1
 

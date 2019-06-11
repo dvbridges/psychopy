@@ -1136,6 +1136,10 @@ class BuilderFrame(wx.Frame):
         self.app.trackFrame(self)
         self.SetDropTarget(FileDropTarget(targetFrame=self))
 
+        self.PavLaunch = pavlovia_ui.PavloviaLaunchCenter(frame=self)
+        # self.PavLaunch.issuePanel.write("2002: This is a warning\n")
+        # self.PavLaunch.issuePanel.write("1001: This is an error\n")
+
     def makeToolbar(self):
         """Produces Toolbar for the Builder Frame"""
         # ---toolbar---#000000#FFFFFF-----------------------------------------

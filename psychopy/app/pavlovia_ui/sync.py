@@ -26,12 +26,14 @@ class SyncFrame(wx.Frame):
 
 
 class SyncStatusPanel(wx.Panel):
+
     def __init__(self, parent, id, *args, **kwargs):
+        size = kwargs.pop("size", None)
         # init super classes
         wx.Panel.__init__(self, parent, id, *args, **kwargs)
         # set self properties
         self.parent = parent
-        self.infoStream = InfoStream(self, -1, size=(250, 150))
+        self.infoStream = InfoStream(self, -1, size=size)
         # self.progBar = wx.Gauge(self, -1, range=1, size=(200, -1))
 
         self.mainSizer = wx.BoxSizer(wx.VERTICAL)
@@ -50,7 +52,7 @@ class SyncStatusPanel(wx.Panel):
         wx.Yield()
 
     def statusAppend(self, newText):
-        text = self.infoStream.GetValue() + newText
+        text = self.infoStream.GetValue() + '\n' + newText
         self.setStatus(text)
 
 
