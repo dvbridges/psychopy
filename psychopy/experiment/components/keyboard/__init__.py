@@ -141,7 +141,9 @@ class KeyboardComponent(BaseComponent):
             return
 
     def writeRoutineStartCodeJS(self, buff):
-        code = "%(name)s = new core.BuilderKeyResponse(psychoJS);\n\n"
+        code = ("%(name)s = new core.BuilderKeyResponse(psychoJS);\n"
+                "%(name)s.baseTime = 0;\n"
+                "%(name)s.clock = function() {%(name)s.baseTime = util.MonotonicClock.getReferenceTime()};\n\n")
         buff.writeIndentedLines(code % self.params)
 
         if (self.params['store'].val == 'nothing' and
@@ -334,10 +336,10 @@ class KeyboardComponent(BaseComponent):
 
         if store != 'nothing':
             if self.params['syncScreenRefresh'].val:
-                code = ("psychoJS.window.callOnFlip(function() { %(name)s.clock.reset(); });"
+                code = ("psychoJS.window.callOnFlip(function() { %(name)s.clock(); });"
                         " // t = 0 on screen flip\n") % self.params
             else:
-                code = "%(name)s.clock.reset();  // now t=0\n" % self.params
+                code = "%(name)s.clock();  // now t=0\n" % self.params
 
             buff.writeIndented(code)
 
@@ -374,14 +376,14 @@ class KeyboardComponent(BaseComponent):
                 keyList = list(keyList)
             elif isinstance(keyList, basestring):  # a single string/key
                 keyList = [keyList]
-            keyListStr = "{keyList:%s}" % repr(keyList)
+            keyListStr = "keyList: %s" % repr(keyList)
 
         # check for keypresses
-        buff.writeIndented("let theseKeys = psychoJS.eventManager.getKeys(%s);\n" % keyListStr)
+        buff.writeIndented("let theseKeys = psychoJS.eventManager.getKeys({%s, timeStamped: true});\n" % keyListStr)
 
         if self.exp.settings.params['Enable Escape'].val:
             code = ("\n// check for quit:\n"
-                    "if (theseKeys.indexOf('escape') > -1) {\n"
+                    "if (theseKeys.length > 0 && theseKeys[0].indexOf('escape') > -1) {\n"
                     "  psychoJS.experiment.experimentEnded = true;\n"
                     "}\n\n")
             buff.writeIndentedLines(code)
@@ -403,18 +405,18 @@ class KeyboardComponent(BaseComponent):
             buff.setIndentLevel(1, True)
             dedentAtEnd += 1  # to undo this level of "if"
 
-            code = ("%(name)s.keys = theseKeys[0];"
+            code = ("%(name)s.keys = theseKeys[0][0];"
                     "  // just the first key pressed\n"
-                    "%(name)s.rt = %(name)s.clock.getTime();\n")
+                    "%(name)s.rt = (theseKeys[0][1]*1000)-%(name)s.baseTime;\n")
             buff.writeIndentedLines(code % self.params)
         elif store == 'last key':
-            code = ("%(name)s.keys = theseKeys[theseKeys.length-1];"
+            code = ("%(name)s.keys = theseKeys[theseKeys.length-1][0];"
                     "  // just the last key pressed\n"
-                    "%(name)s.rt = %(name)s.clock.getTime();\n")
+                    "%(name)s.rt = (theseKeys[theseKeys.length-1][1]*1000)-%(name)s.baseTime;\n")
             buff.writeIndentedLines(code % self.params)
         elif store == 'all keys':
-            code = ("%(name)s.keys = %(name)s.keys.concat(theseKeys);  // storing all keys\n"
-                    "%(name)s.rt = %(name)s.rt.concat(%(name)s.clock.getTime());\n")
+            code = ("%(name)s.keys = %(name)s.keys.concat(theseKeys[0][0]);  // storing all keys\n"
+                    "%(name)s.rt = %(name)s.rt.concat(theseKeys[0][1]*1000)-%(name)s.baseTime);\n")
             buff.writeIndentedLines(code % self.params)
 
         if storeCorr:
