@@ -341,7 +341,7 @@ class Routine(list):
         buff.setIndentLevel(-1, relative=True)
         buff.writeIndentedLines("}\n")
 
-    def writeRoutineEndCodeJS(self, buff, modular):
+    def writeRoutineEndCodeJS(self, buff, modular, loopDepth):
         # can we use non-slip timing?
         maxTime, useNonSlip = self.getMaxTime()
 
@@ -363,6 +363,7 @@ class Routine(list):
                     "    thisComponent.setAutoDraw(false);\n"
                     "  }});\n")
         buff.writeIndentedLines(code  % self.params)
+
         # add the EndRoutine code for each component
         for compon in self:
             if "PsychoJS" in compon.targets:
@@ -374,6 +375,14 @@ class Routine(list):
                     'the non-slip timer\n'
                     'routineTimer.reset();\n\n')
             buff.writeIndentedLines(code % self.name)
+
+        # If not in a loop, check for ophaned data and call nextEntry to save
+        if loopDepth == 0:
+            code = ("// Check for and save orphaned data\n"
+                    "if (Object.keys(psychoJS.experiment._thisEntry).length > 0) {\n"
+                    "  psychoJS.experiment.nextEntry();\n"
+                    "}\n\n")
+            buff.writeIndentedLines(code)
 
         buff.writeIndented('return Scheduler.Event.NEXT;\n')
         buff.setIndentLevel(-1, relative=True)
